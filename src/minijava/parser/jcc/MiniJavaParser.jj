@@ -1,5 +1,266 @@
-options{  static = true;}PARSER_BEGIN(JCCMiniJavaParser)package minijava.parser.jcc;
+options
+{
+  static = false;
+}
 
-public class JCCMiniJavaParser{
-  public static void main(String args []) throws ParseException  {    JCCMiniJavaParser parser = new JCCMiniJavaParser(System.in);    while (true)    {      System.out.println("Reading from standard input...");      System.out.print("Enter an expression like \"1+(2+3)*4;\" :");      try      {        switch (JCCMiniJavaParser.one_line())        {          case 0 :           System.out.println("OK.");          break;          case 1 :           System.out.println("Goodbye.");          break;          default :           break;        }      }      catch (Exception e)      {        System.out.println("NOK.");        System.out.println(e.getMessage());        JCCMiniJavaParser.ReInit(System.in);      }      catch (Error e)      {        System.out.println("Oops.");        System.out.println(e.getMessage());        break;      }    }  }}PARSER_END(JCCMiniJavaParser)SKIP :{  " "| "\r"| "\t"| "\n"}TOKEN : /* OPERATORS */{  < PLUS : "+" >| < MINUS : "-" >| < MULTIPLY : "*" >| < DIVIDE : "/" >}TOKEN :{  < CONSTANT : (< DIGIT >)+ >| < #DIGIT : [ "0"-"9" ] >
-| < #LETTER : [ "a"-"z" ] >}int one_line() :{}{  sum() ";"  {    return 0;  }| ";"  {    return 1;  }}void sum() :{}{  term()  (    (      < PLUS >    | < MINUS >    )    term()  )*}void term() :{}{  unary()  (    (      < MULTIPLY >    | < DIVIDE >    )    unary()  )*}void unary() :{}{  < MINUS > element()| element()}void element() :{}{  < CONSTANT >| "(" sum() ")"}
+// -----------------------------------------------------------------------------
+
+PARSER_BEGIN(JCCMiniJavaParser)
+package minijava.parser.jcc;
+
+import minijava.ast.*;
+import minijava.ast.VarDecl.Kind;
+
+public class JCCMiniJavaParser
+{
+  public static void main(String args []) throws ParseException
+  {
+    JCCMiniJavaParser parser = new JCCMiniJavaParser(System.in);
+    while (true)
+    {
+      System.out.println("Reading from standard input...");
+      System.out.print("Enter an expression like \"1+(2+3)*4;\" :");
+      try
+      {
+        switch (parser.one_line())
+        {
+          case 0 : 
+          System.out.println("OK.");
+          break;
+          case 1 : 
+          System.out.println("Goodbye.");
+          break;
+          default : 
+          break;
+        }
+      }
+      catch (Exception e)
+      {
+        System.out.println("NOK.");
+        System.out.println(e.getMessage());
+        parser.ReInit(System.in);
+      }
+      catch (Error e)
+      {
+        System.out.println("Oops.");
+        System.out.println(e.getMessage());
+        break;
+      }
+    }
+  }
+}
+
+PARSER_END(JCCMiniJavaParser)
+
+// -----------------------------------------------------------------------------
+
+SKIP :
+{
+  " "
+| "\r"
+| "\t"
+| "\n"
+}
+
+// -----------------------------------------------------------------------------
+
+TOKEN : /* KEYWORDS */
+{
+  < CLASS   : "class" >
+| < PUBLIC  : "public" >
+| < STATIC  : "static" >
+| < VOID    : "void" >
+| < MAIN    : "main" >
+| < STRING  : "String" >
+| < EXTENDS : "extends" >
+| < RETURN  : "return" >
+| < IF      : "if" >
+| < ELSE    : "else" >
+| < WHILE   : "while" >
+| < TRUE    : "true" >
+| < FALSE   : "false" >
+| < THIS    : "this" >
+| < NEW     : "new" >
+| < LENGTH  : "length" >
+}
+
+// -----------------------------------------------------------------------------
+
+TOKEN : /* OPERATORS */
+{
+  < PLUS      : "+" >
+| < MINUS     : "-" >
+| < MULTIPLY  : "*" >
+| < DIVIDE    : "/" >
+| < EQUAL     : "=" >
+| < AND       : "&&" >
+| < LESS_THAN : "<" >
+| < DOT       : "." >
+| < NOT       : "!" >
+}
+
+// -----------------------------------------------------------------------------
+
+TOKEN : /* SEPARATORS */
+{
+  < LPAR      : "(" >
+| < RPAR      : ")" >
+| < LBRACK    : "[" >
+| < RBRACK    : "]" >
+| < LBRACE    : "{" >
+| < RBRACE    : "}" >
+| < COMMA     : "," >
+| < SEMICOLON : ";" >
+}
+
+// -----------------------------------------------------------------------------
+
+TOKEN : /* METHODS */
+{
+  < PRINTLN : "System.out.println" >
+}
+
+// -----------------------------------------------------------------------------
+
+TOKEN :
+{
+  < TYPE_INT    : "int" >
+| < TYPE        : < TYPE_INT > (< LBRACK > < RBRACK >)?
+                | "boolean"
+                | < IDENTIFIER > >
+| < CONSTANT    : (< DIGIT >)+ >
+| < IDENTIFIER  : < LETTER > (< LETTER > | < DIGIT >)* >
+| < #DIGIT      : [ "0"-"9" ] >
+| < #LETTER     : [ "a"-"z" ] >
+}
+
+// -----------------------------------------------------------------------------
+
+int one_line() :
+{}
+{
+  sum() < SEMICOLON > { return 0; }
+| goal()              { return 0; }
+| < SEMICOLON >       { return 1; }
+}
+
+// -----------------------------------------------------------------------------
+
+void sum() :
+{}
+{
+  term()
+  (
+    (
+      < PLUS >
+    | < MINUS >
+    )
+    term()
+  )*
+}
+
+// -----------------------------------------------------------------------------
+
+void term() :
+{}
+{
+  unary()
+  (
+    (
+      < MULTIPLY >
+    | < DIVIDE >
+    )
+    unary()
+  )*
+}
+
+// -----------------------------------------------------------------------------
+
+void unary() :
+{}
+{
+  < MINUS > element()
+| element()
+}
+
+// -----------------------------------------------------------------------------
+
+void element() :
+{}
+{
+  < CONSTANT >
+| < LPAR > sum() < RPAR >
+}
+
+// -----------------------------------------------------------------------------
+
+void goal() : {}
+{
+  main() (classDeclaration())* < EOF >
+}
+
+// -----------------------------------------------------------------------------
+
+void main() : {}
+{
+  < CLASS > < IDENTIFIER > < LBRACE > < PUBLIC > < STATIC > < VOID > < MAIN > < LPAR > < STRING > < LBRACK > < RBRACK > < IDENTIFIER > < RPAR > < LBRACE > statement() < RBRACE > < RBRACE >
+}
+
+// -----------------------------------------------------------------------------
+
+void classDeclaration() : {}
+{
+  < CLASS > < IDENTIFIER > ( < EXTENDS > < IDENTIFIER > )? < LBRACE > (varDeclaration() | methodDeclaration())* < RBRACE >
+}
+
+// -----------------------------------------------------------------------------
+
+void varDeclaration() : {}
+{
+  < TYPE > < IDENTIFIER > < SEMICOLON >
+}
+
+// -----------------------------------------------------------------------------
+
+void methodDeclaration() : {}
+{
+  < PUBLIC > < TYPE > < IDENTIFIER > < LPAR > formalList() < RPAR > < LBRACE > (varDeclaration())* (statement())* < RETURN > expression() < SEMICOLON > < RBRACE >
+}
+
+// -----------------------------------------------------------------------------
+
+void formalList() : {}
+{
+  (< TYPE > < IDENTIFIER > (< COMMA > < TYPE > < IDENTIFIER > )*)?
+}
+
+// -----------------------------------------------------------------------------
+
+void statement() : {}
+{
+  < LBRACE > (statement())* < RBRACE >
+| < IF > < LPAR > expression() < RPAR > statement() < ELSE > statement()
+| < WHILE > < LPAR > expression() < RPAR > statement()
+| < PRINTLN > < LPAR > expression() < RPAR > < SEMICOLON >
+| < IDENTIFIER > ((< EQUAL > expression() < SEMICOLON >)
+                  | (< LBRACK > expression() < RBRACK > < EQUAL > expression() < SEMICOLON >))
+}
+
+// -----------------------------------------------------------------------------
+
+void expression() : {}
+{
+  expression() ( < AND > | < LESS_THAN > | < PLUS > | < MINUS > | < MULTIPLY > ) expression()
+| expression() < LBRACK > expression() < RBRACK >
+| expression() < DOT > < LENGTH >
+| expression() < DOT > < IDENTIFIER > < LPAR > ( expression() ( < COMMA > expression() )* )? < RPAR >
+| < CONSTANT >
+| < TRUE >
+| < FALSE >
+| < IDENTIFIER >
+| < THIS >
+| < NEW > ( (< TYPE_INT > < LBRACK > expression() < RBRACK >)
+            | (< IDENTIFIER > < LPAR > < RPAR >))
+| < NOT > expression()
+| < LPAR > expression() < RPAR >
+}
