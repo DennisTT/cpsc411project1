@@ -90,26 +90,22 @@ TOKEN :
   < TYPE_INT       : "int" >
 | < TYPE_BOOLEAN   : "boolean" >
 | < TYPE_INT_ARRAY : < TYPE_INT > (< LBRACK > < RBRACK >)? >
-| < TYPE           : < TYPE_INT >
-                   | < TYPE_INT_ARRAY >
-                   | < TYPE_BOOLEAN >
-                   | < IDENTIFIER > >
 | < CONSTANT       : (< DIGIT >)+ >
 | < IDENTIFIER     : < LETTER > (< LETTER > | < DIGIT >)* >
 | < #DIGIT         : [ "0"-"9" ] >
-| < #LETTER        : [ "a"-"z" ] >
+| < #LETTER        : [ "a"-"z", "A"-"Z" ] >
 }
 
 // -----------------------------------------------------------------------------
 
 Program Program() :
 {
-  MainClass mainClass;
-  ClassDecl c;
-  ArrayList<ClassDecl> otherClasses = new ArrayList<ClassDecl>();
+  MainClass             mainClass;
+  ClassDecl             c;
+  ArrayList<ClassDecl>  otherClasses = new ArrayList<ClassDecl>();
 }
 {
-  mainClass=main()
+  mainClass = main()
   (
     c = classDeclaration()
     { otherClasses.add(c); }
@@ -120,51 +116,61 @@ Program Program() :
 
 // -----------------------------------------------------------------------------
 
-MainClass main() : { Token t1; Token t2; Statement s; }
+MainClass main() :
 {
-        < CLASS >
-  t1 =  < IDENTIFIER >
-        < LBRACE >
-        < PUBLIC >
-        < STATIC >
-        < VOID >
-        < MAIN >
-        < LPAR >
-        < STRING >
-        < LBRACK >
-        < RBRACK >
-  t2 =  < IDENTIFIER >
-        < RPAR >
-        < LBRACE >
-  s =   statement()
-        < RBRACE >
-        < RBRACE >
-  { return new MainClass(t1.image, t2.image, s); }
+  Token     className,
+            argName;
+  Statement s;
+}
+{
+              < CLASS >
+  className = < IDENTIFIER >
+              < LBRACE >
+              < PUBLIC >
+              < STATIC >
+              < VOID >
+              < MAIN >
+              < LPAR >
+              < STRING >
+              < LBRACK >
+              < RBRACK >
+  argName   = < IDENTIFIER >
+              < RPAR >
+              < LBRACE >
+  s         = statement()
+              < RBRACE >
+              < RBRACE >
+  { return new MainClass(className.image, argName.image, s); }
 }
 
 // -----------------------------------------------------------------------------
 
 ClassDecl classDeclaration() :
 {
-  Token t1;
-  Token t2;
-  NodeList<VarDecl> vars;
-  NodeList<MethodDecl> methods;
+  Token                 name,
+                        superName = null;
+  VarDecl               v;
+  MethodDecl            m;
+  ArrayList<VarDecl>    vars      = new ArrayList<VarDecl>();
+  ArrayList<MethodDecl> methods   = new ArrayList<MethodDecl>();
 }
 {
   < CLASS >
-  t1 = < IDENTIFIER >
+  name = < IDENTIFIER >
   (
     < EXTENDS >
-    t2 = < IDENTIFIER >
+    superName = < IDENTIFIER >
   )?
   < LBRACE >
   (
-      vars = varDeclaration()
-    | methods = methodDeclaration()
+    v = varDeclaration()    { vars.add(v); }
+  | m = methodDeclaration() { methods.add(m); }
   )*
   < RBRACE >
-  { return new ClassDecl(t1.image, t2.image, vars, methods); }
+  { return new ClassDecl( name.image,
+                          (superName != null) ? superName.image : "",
+                          new NodeList<VarDecl>(vars),
+                          new NodeList<MethodDecl>(methods)); }
 }
 
 // -----------------------------------------------------------------------------
@@ -253,33 +259,129 @@ ArrayList<VarDecl> formalList() :
 
 // -----------------------------------------------------------------------------
 
-void statement() : {}
+Statement statement() :
 {
-  < LBRACE > (statement())* < RBRACE >
-| < IF > < LPAR > Expression() < RPAR > statement() < ELSE > statement()
-| < WHILE > < LPAR > Expression() < RPAR > statement()
-| < PRINTLN > < LPAR > Expression() < RPAR > < SEMICOLON >
-| < IDENTIFIER > ((< EQUAL > Expression() < SEMICOLON >)
-                  | (< LBRACK > Expression() < RBRACK > < EQUAL > Expression() < SEMICOLON >))
+  Token                 name;
+  Expression            e1,
+                        e2;
+  Statement             s1,
+                        s2;
+  ArrayList<Statement>  statements = new ArrayList<Statement>();
+}
+{
+  < LBRACE >
+  (
+    s1 = statement()
+    { statements.add(s1); }
+  )*
+  < RBRACE >
+  { return new Block(new NodeList<Statement>(statements)); }
+|       < IF >
+        < LPAR >
+  e1  = Expression()
+        < RPAR >
+  s1  = statement()
+        < ELSE >
+  s2  = statement()
+  { return new If(e1, s1, s2); }
+|       < WHILE >
+        < LPAR >
+  e1  = Expression()
+        < RPAR >
+  s1  = statement()
+  { return new While(e1, s1); }
+|       < PRINTLN >
+        < LPAR >
+  e1  = Expression()
+        < RPAR >
+        < SEMICOLON >
+  { return new Print(e1); }
+| LOOKAHEAD(2)
+  name  = < IDENTIFIER >
+          < EQUAL >
+  e1    = Expression()
+          < SEMICOLON >
+  { return new Assign(name.image, e1); }
+| name  = < IDENTIFIER >
+          < LBRACK >
+  e1    = Expression()
+          < RBRACK >
+          < EQUAL >
+  e2    = Expression()
+          < SEMICOLON >
+  { return new ArrayAssign(name.image, e1, e2); }
 }
 
 // -----------------------------------------------------------------------------
 
-Expression Expression() : {}
+Expression Expression() :
 {
-/*  Expression() ( < AND > | < LESS_THAN > | < PLUS > | < MINUS > | < MULTIPLY > ) Expression()
-| Expression() < LBRACK > Expression() < RBRACK >
-| Expression() < DOT > < LENGTH >
-| Expression() < DOT > < IDENTIFIER > < LPAR > ( Expression() ( < COMMA > Expression() )* )? < RPAR >
-|*/ < CONSTANT >
-| < TRUE >
-| < FALSE >
-| < IDENTIFIER >
-| < THIS >
-| < NEW > ( (< TYPE_INT > < LBRACK > Expression() < RBRACK >)
-            | (< IDENTIFIER > < LPAR > < RPAR >))
-| < NOT > Expression()
-| < LPAR > Expression() < RPAR >
+  Class                 c;
+  Token                 id;
+  Expression            e1,
+                        e2,
+                        e3;
+  ArrayList<Expression> rands = new ArrayList<Expression>();
+}
+{
+  e1 = Expression()
+  (
+    < AND >       { c = And.class; }
+  | < LESS_THAN > { c = LessThan.class; }
+  | < PLUS >      { c = Plus.class; }
+  | < MINUS >     { c = Minus.class; }
+  | < MULTIPLY >  { c = Multiply.class; }
+  )
+  e2 = Expression()
+  { return c.newInstance(new Object[]{e1, e2}); }
+| e1  = Expression()
+        < LBRACK >
+  e2  = Expression()
+        < RBRACK >
+  { return new ArrayLookup(e1, e2); }
+| e1  = Expression()
+        < DOT >
+        < LENGTH >
+  { return new ArrayLength(e1); }
+| e1  = Expression()
+        < DOT >
+  id  = < IDENTIFIER >
+        < LPAR >
+        (
+          e2 = Expression()
+          (
+            < COMMA >
+            e3 = Expression()
+            { rands.add(e3); }
+          )*
+          { rands.add(e2); }
+        )?
+        < RPAR >
+  { return new Call(e1, id.image, new NodeList<Expression>(rands)); }
+| id = < CONSTANT >   { return new IntegerLiteral(id.image); }
+| < TRUE >            { return new BooleanLiteral(true); }
+| < FALSE >           { return new BooleanLiteral(false); }
+| id = < IDENTIFIER > { return new IdentifierExp(id.image); }
+| < THIS >            { return new This(); }
+| LOOKAHEAD(2)
+        < NEW >
+        < TYPE_INT >
+        < LBRACK >
+  e1  = Expression()
+        < RBRACK >
+  { return new NewArray(e1); }
+|       < NEW >
+  id  = < IDENTIFIER >
+        < LPAR >
+        < RPAR >
+  { return new NewObject(id.image); }
+|       < NOT >
+  e1  = Expression()
+  { return new Not(e1); }
+| < LPAR >
+  e1  = Expression()
+        < RPAR >
+  { return e1; }
 }
 
 // -----------------------------------------------------------------------------
@@ -289,18 +391,8 @@ Type Type() :
   Token t;
 }
 {
-  t = < TYPE >
-  {
-    switch(t.kind)
-    {
-      case TYPE_INT:
-      	return new IntegerType();
-      case TYPE_INT_ARRAY:
-      	return new IntArrayType();
-      case TYPE_BOOLEAN:
-      	return new BooleanType();
-      case IDENTIFIER:
-      	return new ObjectType(t.image);
-    }
-  }
+  t = < TYPE_INT >        { return new IntegerType(); }
+| t = < TYPE_INT_ARRAY >  { return new IntArrayType(); }
+| t = < TYPE_BOOLEAN >    { return new BooleanType(); }
+| t = < IDENTIFIER >      { return new ObjectType(t.image); }
 }
