@@ -109,7 +109,7 @@ TOKEN :
 {
   < TYPE_INT       : "int" >
 | < TYPE_BOOLEAN   : "boolean" >
-| < TYPE_INT_ARRAY : < TYPE_INT > (< LBRACK > < RBRACK >) >
+//| < TYPE_INT_ARRAY : "int" (< LBRACK > < RBRACK >)? >
 | < CONSTANT       : (< DIGIT >)+ >
 | < IDENTIFIER     : < LETTER > (< LETTER > | < DIGIT > | "_")* >
 | < #DIGIT         : [ "0"-"9" ] >
@@ -429,9 +429,12 @@ Expression Expression() :
 
 Type Type() :
 { Token t; }
-{
-  t = < TYPE_INT >        { return new IntegerType(); }
-| t = < TYPE_INT_ARRAY >  { return new IntArrayType(); }
+{ t = < TYPE_INT >
+      (        < LBRACK >
+        < RBRACK >
+        { return new IntArrayType(); }
+      )?
+      { return new IntegerType(); }
 | t = < TYPE_BOOLEAN >    { return new BooleanType(); }
 | t = < IDENTIFIER >      { return new ObjectType(t.image); }
 }
