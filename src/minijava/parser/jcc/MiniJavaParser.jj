@@ -87,14 +87,17 @@ TOKEN : /* METHODS */
 
 TOKEN :
 {
-  < TYPE_INT    : "int" >
-| < TYPE        : < TYPE_INT > (< LBRACK > < RBRACK >)?
-                | "boolean"
-                | < IDENTIFIER > >
-| < CONSTANT    : (< DIGIT >)+ >
-| < IDENTIFIER  : < LETTER > (< LETTER > | < DIGIT >)* >
-| < #DIGIT      : [ "0"-"9" ] >
-| < #LETTER     : [ "a"-"z" ] >
+  < TYPE_INT       : "int" >
+| < TYPE_BOOLEAN   : "boolean" >
+| < TYPE_INT_ARRAY : < TYPE_INT > (< LBRACK > < RBRACK >)? >
+| < TYPE           : < TYPE_INT >
+                   | < TYPE_INT_ARRAY >
+                   | < TYPE_BOOLEAN >
+                   | < IDENTIFIER > >
+| < CONSTANT       : (< DIGIT >)+ >
+| < IDENTIFIER     : < LETTER > (< LETTER > | < DIGIT >)* >
+| < #DIGIT         : [ "0"-"9" ] >
+| < #LETTER        : [ "a"-"z" ] >
 }
 
 // -----------------------------------------------------------------------------
@@ -166,23 +169,83 @@ ClassDecl classDeclaration() :
 
 // -----------------------------------------------------------------------------
 
-void varDeclaration() : {}
+VarDecl varDeclaration() :
 {
-  < TYPE > < IDENTIFIER > < SEMICOLON >
+  Type type;
+  Token id;
+}
+{
+  type = Type()
+  id = < IDENTIFIER >
+  < SEMICOLON >
+  { return new VarDecl(VarDecl.Kind.LOCAL, type, id.image); }
 }
 
 // -----------------------------------------------------------------------------
 
-void methodDeclaration() : {}
+void methodDeclaration() :
 {
-  < PUBLIC > < TYPE > < IDENTIFIER > < LPAR > formalList() < RPAR > < LBRACE > (varDeclaration())* (statement())* < RETURN > Expression() < SEMICOLON > < RBRACE >
+  Type returnType;
+  Token id;
+  VarDecl varDecl;
+  Statement s;
+  ArrayList<VarDecl> formals = new ArrayList<VarDecl>();
+  ArrayList<VarDecl> vars = new ArrayList<VarDecl>();
+  ArrayList<Statement> statements = new ArrayList<Statement>();
+  Expression returnExp;
+}
+{
+  < PUBLIC >
+  returnType = Type()
+  id = < IDENTIFIER >
+  < LPAR >
+  formals = formalList()
+  < RPAR >
+  < LBRACE >
+  (
+    varDecl = varDeclaration()
+    {      vars.add(varDecl);
+    }
+  )*
+  (
+    s = statement()
+    {
+      statements.add(s);
+    }
+  )*
+  < RETURN >
+  returnExp = Expression()
+  < SEMICOLON >
+  < RBRACE >
+  { return new MethodDecl(returnType, id.image, formals, vars, statements, returnExp); }
 }
 
 // -----------------------------------------------------------------------------
 
-void formalList() : {}
+ArrayList<VarDecl> formalList() :
 {
-  (< TYPE > < IDENTIFIER > (< COMMA > < TYPE > < IDENTIFIER > )*)?
+  Type t;
+  Token id;
+  ArrayList<VarDecl> formals = new ArrayList<VarDecl>();
+}
+{
+  (
+    t = Type()
+    id = < IDENTIFIER >
+    {      formals.add(new VarDecl(VarDecl.Kind.FORMAL, t, id.image));
+    }
+    (
+      < COMMA >
+      t = Type()
+      id = < IDENTIFIER >
+      {
+        formals.add(new VarDecl(VarDecl.Kind.FORMAL, t, id.image));
+      }
+    )*
+  )?
+
+  {    return formals;
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -214,4 +277,24 @@ Expression Expression() : {}
             | (< IDENTIFIER > < LPAR > < RPAR >))
 | < NOT > Expression()
 | < LPAR > Expression() < RPAR >
+}
+
+// -----------------------------------------------------------------------------
+
+Type Type() :
+{  Token t;
+}
+{  t = < TYPE >
+  {
+    switch(t.kind)
+    {
+      case TYPE_INT:
+      	return new IntegerType();
+      case TYPE_INT_ARRAY:
+      	return new IntArrayType();
+      case TYPE_BOOLEAN:
+      	return new BooleanType();
+      case IDENTIFIER:
+      	return new ObjectType(t.image);
+    }  }
 }
