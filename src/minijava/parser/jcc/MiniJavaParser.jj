@@ -23,6 +23,26 @@ SKIP :
 | "\r"
 | "\t"
 | "\n"
+|  < "//" (~["\n", "\r"])* ("\n" | "\r")? >
+}
+
+// http://www.engr.mun.ca/~theo/JavaCC-FAQ/javacc-faq-moz.htm#tth_sEc3.10
+// When a /* is seen in the DEFAULT state, skip it and switch to the IN_COMMENT state
+SKIP :
+{
+  "/*": IN_COMMENT
+}
+      
+// When any other character is seen in the IN_COMMENT state, skip it.
+< IN_COMMENT > SKIP :
+{
+  <  ~[] >
+}
+      
+// When a */ is seen in the IN_COMMENT state, skip it and switch back to the DEFAULT state
+< IN_COMMENT > SKIP :
+{
+  "*/": DEFAULT
 }
 
 // -----------------------------------------------------------------------------
@@ -89,7 +109,7 @@ TOKEN :
 {
   < TYPE_INT       : "int" >
 | < TYPE_BOOLEAN   : "boolean" >
-| < TYPE_INT_ARRAY : < TYPE_INT > (< LBRACK > < RBRACK >)? >
+| < TYPE_INT_ARRAY : < TYPE_INT > (< LBRACK > < RBRACK >) >
 | < CONSTANT       : (< DIGIT >)+ >
 | < IDENTIFIER     : < LETTER > (< LETTER > | < DIGIT > | "_")* >
 | < #DIGIT         : [ "0"-"9" ] >
@@ -160,19 +180,19 @@ ClassDecl ClassDeclaration() :
   )?
   < LBRACE >
   (
-    v = VarDeclaration()    { vars.add(v); }
+    v = VarDeclaration(VarDecl.Kind.FIELD)    { vars.add(v); }
   | m = MethodDeclaration() { methods.add(m); }
   )*
   < RBRACE >
   { return new ClassDecl( name.image,
-                          (superName != null) ? superName.image : "",
+                          (superName != null) ? superName.image : null,
                           new NodeList<VarDecl>(vars),
                           new NodeList<MethodDecl>(methods)); }
 }
 
 // -----------------------------------------------------------------------------
 
-VarDecl VarDeclaration() :
+VarDecl VarDeclaration(VarDecl.Kind kind) :
 {
   Type  type;
   Token id;
@@ -181,7 +201,7 @@ VarDecl VarDeclaration() :
   type  = Type()
   id    = < IDENTIFIER >
           < SEMICOLON >
-  { return new VarDecl(VarDecl.Kind.LOCAL, type, id.image); }
+  { return new VarDecl(kind, type, id.image); }
 }
 
 // -----------------------------------------------------------------------------
@@ -207,7 +227,7 @@ MethodDecl MethodDeclaration() :
                 < LBRACE >
   (
     LOOKAHEAD(2)
-    varDecl   = VarDeclaration()  { vars.add(varDecl); }
+    varDecl   = VarDeclaration(VarDecl.Kind.LOCAL)  { vars.add(varDecl); }
   )*
   (
     LOOKAHEAD(2)
