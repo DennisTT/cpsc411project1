@@ -349,29 +349,28 @@ Expression ExprRest(Expression e) :
     (
       < AND >
       e2 = Expression()
-      { return new And(e1, e2); }
+      { return ExprRest(new And(e1, e2)); }
     | < LESS_THAN >
       e2 = Expression()
-      { return new LessThan(e1, e2); }
+      { return ExprRest(new LessThan(e1, e2)); }
     | < PLUS >
       e2 = Expression()
-      { return new Plus(e1, e2); }
+      { return ExprRest(new Plus(e1, e2)); }
     | < MINUS >
       e2 = Expression()
-      { return new Minus(e1, e2); }
+      { return ExprRest(new Minus(e1, e2)); }
     | < MULTIPLY >
       e2 = Expression()
-      { return new Times(e1, e2); }
+      { return ExprRest(new Times(e1, e2)); }
     )
-
   |       < LBRACK >
     e2  = Expression()
           < RBRACK >
-    { return new ArrayLookup(e1, e2); }
+    { return ExprRest(new ArrayLookup(e1, e2)); }
   | LOOKAHEAD(2)
           < DOT >
           < LENGTH >
-    { return new ArrayLength(e1); }
+    { return ExprRest(new ArrayLength(e1)); }
   |       < DOT >
     id  = < IDENTIFIER >
           < LPAR >
@@ -385,7 +384,9 @@ Expression ExprRest(Expression e) :
             )*
           )?
           < RPAR >
-    { return new Call(e1, id.image, new NodeList<Expression>(rands)); }
+    { return ExprRest(new Call( e1,
+                                id.image,
+                                new NodeList<Expression>(rands))); }
   | { return e; }
    
   )
