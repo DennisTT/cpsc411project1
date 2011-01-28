@@ -105,18 +105,15 @@ Program Program() :
   ArrayList<ClassDecl>  otherClasses = new ArrayList<ClassDecl>();
 }
 {
-  mainClass = main()
-  (
-    c = classDeclaration()
-    { otherClasses.add(c); }
-  )*
-  < EOF >
+  mainClass = Main()
+  ( c       = ClassDeclaration() { otherClasses.add(c); } )*
+              < EOF >
   { return new Program(mainClass, new NodeList<ClassDecl>(otherClasses)); }
 }
 
 // -----------------------------------------------------------------------------
 
-MainClass main() :
+MainClass Main() :
 {
   Token     className,
             argName;
@@ -137,7 +134,7 @@ MainClass main() :
   argName   = < IDENTIFIER >
               < RPAR >
               < LBRACE >
-  s         = statement()
+  s         = Statement()
               < RBRACE >
               < RBRACE >
   { return new MainClass(className.image, argName.image, s); }
@@ -145,7 +142,7 @@ MainClass main() :
 
 // -----------------------------------------------------------------------------
 
-ClassDecl classDeclaration() :
+ClassDecl ClassDeclaration() :
 {
   Token                 name,
                         superName = null;
@@ -163,8 +160,8 @@ ClassDecl classDeclaration() :
   )?
   < LBRACE >
   (
-    v = varDeclaration()    { vars.add(v); }
-  | m = methodDeclaration() { methods.add(m); }
+    v = VarDeclaration()    { vars.add(v); }
+  | m = MethodDeclaration() { methods.add(m); }
   )*
   < RBRACE >
   { return new ClassDecl( name.image,
@@ -175,91 +172,79 @@ ClassDecl classDeclaration() :
 
 // -----------------------------------------------------------------------------
 
-VarDecl varDeclaration() :
+VarDecl VarDeclaration() :
 {
-  Type type;
+  Type  type;
   Token id;
 }
 {
-  type = Type()
-  id = < IDENTIFIER >
-  < SEMICOLON >
+  type  = Type()
+  id    = < IDENTIFIER >
+          < SEMICOLON >
   { return new VarDecl(VarDecl.Kind.LOCAL, type, id.image); }
 }
 
 // -----------------------------------------------------------------------------
 
-MethodDecl methodDeclaration() :
+MethodDecl MethodDeclaration() :
 {
-  Type returnType;
-  Token id;
-  VarDecl varDecl;
-  Statement s;
-  ArrayList<VarDecl> formals = new ArrayList<VarDecl>();
-  ArrayList<VarDecl> vars = new ArrayList<VarDecl>();
-  ArrayList<Statement> statements = new ArrayList<Statement>();
-  Expression returnExp;
+  Type                  returnType;
+  Token                 id;
+  VarDecl               varDecl;
+  Statement             s;
+  ArrayList<VarDecl>    formals     = new ArrayList<VarDecl>();
+  ArrayList<VarDecl>    vars        = new ArrayList<VarDecl>();
+  ArrayList<Statement>  statements  = new ArrayList<Statement>();
+  Expression            returnExp;
 }
 {
-  < PUBLIC >
-  returnType = Type()
-  id = < IDENTIFIER >
-  < LPAR >
-  formals = formalList()
-  < RPAR >
-  < LBRACE >
-  (
-    varDecl = varDeclaration()
-    {
-      vars.add(varDecl);
-    }
-  )*
-  (
-    s = statement()
-    {
-      statements.add(s);
-    }
-  )*
-  < RETURN >
-  returnExp = Expression()
-  < SEMICOLON >
-  < RBRACE >
-  { return new MethodDecl(returnType, id.image, formals, vars, statements, returnExp); }
+                < PUBLIC >
+  returnType  = Type()
+  id          = < IDENTIFIER >
+                < LPAR >
+  formals     = FormalList()
+                < RPAR >
+                < LBRACE >
+  ( varDecl   = VarDeclaration()  { vars.add(varDecl); } )*
+  ( s         = Statement()       { statements.add(s); } )*
+                < RETURN >
+  returnExp   = Expression()
+                < SEMICOLON >
+                < RBRACE >
+  { return new MethodDecl(returnType,
+                          id.image,
+                          formals,
+                          vars,
+                          statements,
+                          returnExp); }
 }
 
 // -----------------------------------------------------------------------------
 
-ArrayList<VarDecl> formalList() :
+ArrayList<VarDecl> FormalList() :
 {
-  Type t;
-  Token id;
-  ArrayList<VarDecl> formals = new ArrayList<VarDecl>();
+  Type                t;
+  Token               id;
+  ArrayList<VarDecl>  formals = new ArrayList<VarDecl>();
 }
 {
   (
-    t = Type()
-    id = < IDENTIFIER >
-    {
-      formals.add(new VarDecl(VarDecl.Kind.FORMAL, t, id.image));
-    }
+    t   = Type()
+    id  = < IDENTIFIER >
+    { formals.add(new VarDecl(VarDecl.Kind.FORMAL, t, id.image)); }
     (
-      < COMMA >
-      t = Type()
-      id = < IDENTIFIER >
-      {
-        formals.add(new VarDecl(VarDecl.Kind.FORMAL, t, id.image));
-      }
+            < COMMA >
+      t   = Type()
+      id  = < IDENTIFIER >
+      { formals.add(new VarDecl(VarDecl.Kind.FORMAL, t, id.image)); }
     )*
   )?
-
-  {
-    return formals;
-  }
+  { return formals; }
 }
 
 // -----------------------------------------------------------------------------
 
-Statement statement() :
+Statement Statement() :
 {
   Token                 name;
   Expression            e1,
@@ -269,26 +254,23 @@ Statement statement() :
   ArrayList<Statement>  statements = new ArrayList<Statement>();
 }
 {
-  < LBRACE >
-  (
-    s1 = statement()
-    { statements.add(s1); }
-  )*
-  < RBRACE >
+          < LBRACE >
+  ( s1  = Statement() { statements.add(s1); } )*
+          < RBRACE >
   { return new Block(new NodeList<Statement>(statements)); }
 |       < IF >
         < LPAR >
   e1  = Expression()
         < RPAR >
-  s1  = statement()
+  s1  = Statement()
         < ELSE >
-  s2  = statement()
+  s2  = Statement()
   { return new If(e1, s1, s2); }
 |       < WHILE >
         < LPAR >
   e1  = Expression()
         < RPAR >
-  s1  = statement()
+  s1  = Statement()
   { return new While(e1, s1); }
 |       < PRINTLN >
         < LPAR >
@@ -349,12 +331,12 @@ Expression Expression() :
         < LPAR >
         (
           e2 = Expression()
+          { rands.add(e2); }
           (
             < COMMA >
             e3 = Expression()
             { rands.add(e3); }
           )*
-          { rands.add(e2); }
         )?
         < RPAR >
   { return new Call(e1, id.image, new NodeList<Expression>(rands)); }
@@ -387,9 +369,7 @@ Expression Expression() :
 // -----------------------------------------------------------------------------
 
 Type Type() :
-{
-  Token t;
-}
+{ Token t; }
 {
   t = < TYPE_INT >        { return new IntegerType(); }
 | t = < TYPE_INT_ARRAY >  { return new IntArrayType(); }
