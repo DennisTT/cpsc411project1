@@ -295,7 +295,104 @@ Statement Statement() :
 }
 
 // -----------------------------------------------------------------------------
+Expression ExprVal() :
+{
+  Token                 id;
+  Expression            e1;
+}
+{ id = < CONSTANT >   { return new IntegerLiteral(id.image); }
+| < TRUE >            { return new BooleanLiteral(true); }
+| < FALSE >           { return new BooleanLiteral(false); }
+| id = < IDENTIFIER > { return new IdentifierExp(id.image); }
+| < THIS >            { return new This(); }
+| LOOKAHEAD(2)
+        < NEW >
+        < TYPE_INT >
+        < LBRACK >
+  e1  = Expression()
+        < RBRACK >
+  { return new NewArray(e1); }
+|       < NEW >
+  id  = < IDENTIFIER >
+        < LPAR >
+        < RPAR >
+  { return new NewObject(id.image); }
+|       < NOT >
+  e1  = Expression()
+  { return new Not(e1); }
+| < LPAR >
+  e1  = Expression()
+        < RPAR >
+  { return e1; }
+}
+Expression ExprRest(Expression e) :
+{
+  Class                 c;
+  Token                 id;
+  Expression            e1,
+                        e2,
+                        e3;
+  ArrayList<Expression> rands = new ArrayList<Expression>();}{
+  (
+    { e1 = e; }
+    (
+      < AND >
+      e2 = Expression()
+      { return new And(e1, e2); }
+    | < LESS_THAN >
+      e2 = Expression()
+      { return new LessThan(e1, e2); }
+    | < PLUS >
+      e2 = Expression()
+      { return new Plus(e1, e2); }
+    | < MINUS >
+      e2 = Expression()
+      { return new Minus(e1, e2); }
+    | < MULTIPLY >
+      e2 = Expression()
+      { return new Times(e1, e2); }
+    )
 
+  | { e1 = e; }
+          < LBRACK >
+    e2  = Expression()
+          < RBRACK >
+    { return new ArrayLookup(e1, e2); }
+  | LOOKAHEAD(2)
+    { e1 = e; }
+          < DOT >
+          < LENGTH >
+    { return new ArrayLength(e1); }
+  | { e1 = e; }
+          < DOT >
+    id  = < IDENTIFIER >
+          < LPAR >
+          (
+            e2 = Expression()
+            { rands.add(e2); }
+            (
+              < COMMA >
+              e3 = Expression()
+              { rands.add(e3); }
+            )*
+          )?
+          < RPAR >
+    { return new Call(e1, id.image, new NodeList<Expression>(rands)); }
+  )
+
+  {    return e;
+  }}
+Expression Expression() :{
+  Expression e;
+  Expression r;}
+{
+  e = ExprVal()
+  r = ExprRest(e)
+  {    return r;
+  }
+}
+
+/*
 Expression Expression() :
 {
   Class                 c;
@@ -364,7 +461,7 @@ Expression Expression() :
   e1  = Expression()
         < RPAR >
   { return e1; }
-}
+}*/
 
 // -----------------------------------------------------------------------------
 
