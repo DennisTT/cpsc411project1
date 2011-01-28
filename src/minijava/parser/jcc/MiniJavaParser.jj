@@ -301,10 +301,11 @@ Statement Statement() :
 }
 
 // -----------------------------------------------------------------------------
+
 Expression ExprVal() :
 {
-  Token                 id;
-  Expression            e1;
+  Token       id;
+  Expression  e;
 }
 { id = < CONSTANT >   { return new IntegerLiteral(id.image); }
 | < TRUE >            { return new BooleanLiteral(true); }
@@ -315,32 +316,36 @@ Expression ExprVal() :
         < NEW >
         < TYPE_INT >
         < LBRACK >
-  e1  = Expression()
+  e   = Expression()
         < RBRACK >
-  { return new NewArray(e1); }
+  { return new NewArray(e); }
 |       < NEW >
   id  = < IDENTIFIER >
         < LPAR >
         < RPAR >
   { return new NewObject(id.image); }
-|       < NOT >
-  e1  = Expression()
-  { return new Not(e1); }
-| < LPAR >
-  e1  = Expression()
-        < RPAR >
-  { return e1; }
+|   < NOT >
+  e = Expression()
+  { return new Not(e); }
+|     < LPAR >
+  e   = Expression()
+      < RPAR >
+  { return e; }
 }
+
+// -----------------------------------------------------------------------------
+
 Expression ExprRest(Expression e) :
 {
-  Class                 c;
   Token                 id;
   Expression            e1,
                         e2,
                         e3;
-  ArrayList<Expression> rands = new ArrayList<Expression>();}{
+  ArrayList<Expression> rands = new ArrayList<Expression>();
+}
+{
+  { e1 = e; }
   (
-    { e1 = e; }
     (
       < AND >
       e2 = Expression()
@@ -359,18 +364,15 @@ Expression ExprRest(Expression e) :
       { return new Times(e1, e2); }
     )
 
-  | { e1 = e; }
-          < LBRACK >
+  |       < LBRACK >
     e2  = Expression()
           < RBRACK >
     { return new ArrayLookup(e1, e2); }
   | LOOKAHEAD(2)
-    { e1 = e; }
           < DOT >
           < LENGTH >
     { return new ArrayLength(e1); }
-  | { e1 = e; }
-          < DOT >
+  |       < DOT >
     id  = < IDENTIFIER >
           < LPAR >
           (
@@ -384,88 +386,23 @@ Expression ExprRest(Expression e) :
           )?
           < RPAR >
     { return new Call(e1, id.image, new NodeList<Expression>(rands)); }
-  |  {    return e;  }   
-  )}
-Expression Expression() :{
-  Expression e;
-  Expression r;}
+  | { return e; }
+   
+  )
+}
+
+// -----------------------------------------------------------------------------
+
+Expression Expression() :
+{
+  Expression  e,
+              r;
+}
 {
   e = ExprVal()
   r = ExprRest(e)
-  {    return r;
-  }
+  { return r; }
 }
-
-/*
-Expression Expression() :
-{
-  Class                 c;
-  Token                 id;
-  Expression            e1,
-                        e2,
-                        e3;
-  ArrayList<Expression> rands = new ArrayList<Expression>();
-}
-{
-  e1 = Expression()
-  (
-    < AND >       { c = And.class; }
-  | < LESS_THAN > { c = LessThan.class; }
-  | < PLUS >      { c = Plus.class; }
-  | < MINUS >     { c = Minus.class; }
-  | < MULTIPLY >  { c = Multiply.class; }
-  )
-  e2 = Expression()
-  { return c.newInstance(new Object[]{e1, e2}); }
-| e1  = Expression()
-        < LBRACK >
-  e2  = Expression()
-        < RBRACK >
-  { return new ArrayLookup(e1, e2); }
-| e1  = Expression()
-        < DOT >
-        < LENGTH >
-  { return new ArrayLength(e1); }
-| e1  = Expression()
-        < DOT >
-  id  = < IDENTIFIER >
-        < LPAR >
-        (
-          e2 = Expression()
-          { rands.add(e2); }
-          (
-            < COMMA >
-            e3 = Expression()
-            { rands.add(e3); }
-          )*
-        )?
-        < RPAR >
-  { return new Call(e1, id.image, new NodeList<Expression>(rands)); }
-| id = < CONSTANT >   { return new IntegerLiteral(id.image); }
-| < TRUE >            { return new BooleanLiteral(true); }
-| < FALSE >           { return new BooleanLiteral(false); }
-| id = < IDENTIFIER > { return new IdentifierExp(id.image); }
-| < THIS >            { return new This(); }
-| LOOKAHEAD(2)
-        < NEW >
-        < TYPE_INT >
-        < LBRACK >
-  e1  = Expression()
-        < RBRACK >
-  { return new NewArray(e1); }
-|       < NEW >
-  id  = < IDENTIFIER >
-        < LPAR >
-        < RPAR >
-  { return new NewObject(id.image); }
-|       < NOT >
-  e1  = Expression()
-  { return new Not(e1); }
-| < LPAR >
-  e1  = Expression()
-        < RPAR >
-  { return e1; }
-}*/
 
 // -----------------------------------------------------------------------------
 
