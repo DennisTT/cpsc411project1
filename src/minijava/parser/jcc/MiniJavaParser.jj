@@ -378,10 +378,8 @@ Expression ExprRest(Expression e) :
           )?
           < RPAR >
     { return new Call(e1, id.image, new NodeList<Expression>(rands)); }
-  )
-
-  {    return e;
-  }}
+  |  {    return e;  }   
+  )}
 Expression Expression() :{
   Expression e;
   Expression r;}
