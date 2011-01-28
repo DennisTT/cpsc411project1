@@ -205,8 +205,14 @@ MethodDecl MethodDeclaration() :
   formals     = FormalList()
                 < RPAR >
                 < LBRACE >
-  ( varDecl   = VarDeclaration()  { vars.add(varDecl); } )*
-  ( s         = Statement()       { statements.add(s); } )*
+  (
+    LOOKAHEAD(2)
+    varDecl   = VarDeclaration()  { vars.add(varDecl); }
+  )*
+  (
+    LOOKAHEAD(2)
+    s         = Statement()       { statements.add(s); }
+  )*
                 < RETURN >
   returnExp   = Expression()
                 < SEMICOLON >
