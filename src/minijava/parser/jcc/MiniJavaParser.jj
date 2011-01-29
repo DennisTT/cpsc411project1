@@ -355,7 +355,7 @@ Expression ExprVal() :
 
 // -----------------------------------------------------------------------------
 
-Expression ExprRest(Expression e) :
+Expression ExprValRest(Expression e) :
 {
   Token                 id;
   Expression            e1,
@@ -366,24 +366,7 @@ Expression ExprRest(Expression e) :
 {
   { e1 = e; }
   (
-    (
-      < AND >
-      e2 = Expression()
-      { return ExprRest(new And(e1, e2)); }
-    | < LESS_THAN >
-      e2 = Expression()
-      { return ExprRest(new LessThan(e1, e2)); }
-    | < PLUS >
-      e2 = Expression()
-      { return ExprRest(new Plus(e1, e2)); }
-    | < MINUS >
-      e2 = Expression()
-      { return ExprRest(new Minus(e1, e2)); }
-    | < MULTIPLY >
-      e2 = Expression()
-      { return ExprRest(new Times(e1, e2)); }
-    )
-  |       < LBRACK >
+          < LBRACK >
     e2  = Expression()
           < RBRACK >
     { return ExprRest(new ArrayLookup(e1, e2)); }
@@ -410,6 +393,55 @@ Expression ExprRest(Expression e) :
   | { return e; }
    
   )
+}
+
+// -----------------------------------------------------------------------------
+
+Expression ExprRest(Expression e) :
+{
+  Token                 id;
+  Expression            e1,
+                        e2,
+                        e3;
+  ArrayList<Expression> rands = new ArrayList<Expression>();
+}
+{
+  { e1 = e; }
+  (
+    (
+      < AND >
+      e2 = Expr2()
+      { return ExprRest(new And(e1, e2)); }
+    | < LESS_THAN >
+      e2 = Expr2()
+      { return ExprRest(new LessThan(e1, e2)); }
+    | < PLUS >
+      e2 = Expr2()
+      { return ExprRest(new Plus(e1, e2)); }
+    | < MINUS >
+      e2 = Expr2()
+      { return ExprRest(new Minus(e1, e2)); }
+    | < MULTIPLY >
+      e2 = Expr2()
+      { return ExprRest(new Times(e1, e2)); }
+    )
+  | e2 = ExprValRest(e1)
+    { return e2; }
+
+  )
+}
+
+// -----------------------------------------------------------------------------
+
+Expression Expr2() :
+{
+  Expression  e,
+              r;
+}
+{
+  e = ExprVal()
+  r = ExprValRest(e)
+  { return r; }
 }
 
 // -----------------------------------------------------------------------------
