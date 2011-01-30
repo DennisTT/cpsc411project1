@@ -322,7 +322,13 @@ Statement Statement() :
 
 // -----------------------------------------------------------------------------
 
-Expression ExprVal() :
+Expression Expression() :
+{ Expression e; }
+{ e = AndExpr() { return e; } }
+
+// -----------------------------------------------------------------------------
+
+Expression BasicExpr() :
 {
   Token       id;
   Expression  e;
@@ -344,9 +350,6 @@ Expression ExprVal() :
         < LPAR >
         < RPAR >
   { return new NewObject(id.image); }
-|   < NOT >
-  e = Expression()
-  { return new Not(e); }
 |     < LPAR >
   e   = Expression()
       < RPAR >
@@ -355,118 +358,151 @@ Expression ExprVal() :
 
 // -----------------------------------------------------------------------------
 
-Expression ExprValRest(Expression e) :
+Expression AndExpr() :
+{
+  Expression e1,
+             e2;
+}
+{
+  e1 = LessThanExpr()
+  (         < AND >
+    e2 = LessThanExpr()
+    { e1 = new And(e1, e2); }
+  )*
+  { return e1; }
+}
+
+// -----------------------------------------------------------------------------
+
+Expression LessThanExpr() :
+{
+  Expression e1,
+             e2;
+}
+{
+  e1 = AddMinusExpr()
+  (
+         < LESS_THAN >
+    e2 = AddMinusExpr()
+    { e1 = new LessThan(e1, e2); }
+  )*
+  { return e1; }
+}
+
+// -----------------------------------------------------------------------------
+
+Expression AddMinusExpr() :
+{  Expression e1,
+             e2;
+}
+{  e1 = MultExpr()
+  (
+         < PLUS >
+    e2 = MultExpr()
+    { e1 = new Plus(e1, e2); }
+  |      < MINUS >
+    e2 = MultExpr()
+    { e1 = new Minus(e1, e2); }
+  )*
+  { return e1; }
+}
+
+// -----------------------------------------------------------------------------
+
+Expression MultExpr() :
+{  Expression e1,
+             e2;
+}
+{  e1 = NotExpr()
+  (         < MULTIPLY >
+    e2 = NotExpr()
+    { e1 = new Times(e1, e2); }
+  )*
+  { return e1; }
+}
+
+// -----------------------------------------------------------------------------
+
+Expression NotExpr() :
+{  Expression e;
+  int numNots = 0;
+}
+{  (
+    < NOT >
+    { numNots++; }
+  )*
+  e = AccessorExpr()
+  {
+    for(int i = 0; i < numNots; i++)
+    {      e = new Not(e);
+    }
+    return e;
+  }
+}
+// -----------------------------------------------------------------------------
+
+Expression AccessorExpr() :
+{
+  Expression  e1,
+              e2;
+}
+{
+  e1 = BasicExpr()
+  (
+    e1 = AccessorExprTail(e1)
+  )*
+  { return e1; }
+}
+
+// -----------------------------------------------------------------------------
+
+Expression AccessorExprTail(Expression e) :
 {
   Token                 id;
   Expression            e1,
-                        e2,
-                        e3;
+                        e2;
   ArrayList<Expression> rands = new ArrayList<Expression>();
 }
 {
-  { e1 = e; }
+        < LBRACK >
+  e1  = Expression()
+        < RBRACK >
+  { return new ArrayLookup(e, e1); }
+| LOOKAHEAD(2)
+  < DOT >
   (
-          < LBRACK >
-    e2  = Expression()
-          < RBRACK >
-    { return ExprRest(new ArrayLookup(e1, e2)); }
-  | LOOKAHEAD(2)
-          < DOT >
-          < LENGTH >
-    { return ExprRest(new ArrayLength(e1)); }
-  |       < DOT >
+    < LENGTH >
+    { return new ArrayLength(e); }
+  |
     id  = < IDENTIFIER >
           < LPAR >
           (
-            e2 = Expression()
-            { rands.add(e2); }
+            e1 = Expression()
+            { rands.add(e1); }
             (
               < COMMA >
-              e3 = Expression()
-              { rands.add(e3); }
+              e2 = Expression()
+              { rands.add(e2); }
             )*
           )?
           < RPAR >
-    { return ExprRest(new Call( e1,
-                                id.image,
-                                new NodeList<Expression>(rands))); }
-  | { return e; }
-   
+    { return new Call(e, id.image, new NodeList<Expression>(rands)); }
   )
-}
-
-// -----------------------------------------------------------------------------
-
-Expression ExprRest(Expression e) :
-{
-  Token                 id;
-  Expression            e1,
-                        e2,
-                        e3;
-  ArrayList<Expression> rands = new ArrayList<Expression>();
-}
-{
-  { e1 = e; }
-  (
-    (
-      < AND >
-      e2 = Expr2()
-      { return ExprRest(new And(e1, e2)); }
-    | < LESS_THAN >
-      e2 = Expr2()
-      { return ExprRest(new LessThan(e1, e2)); }
-    | < PLUS >
-      e2 = Expr2()
-      { return ExprRest(new Plus(e1, e2)); }
-    | < MINUS >
-      e2 = Expr2()
-      { return ExprRest(new Minus(e1, e2)); }
-    | < MULTIPLY >
-      e2 = Expr2()
-      { return ExprRest(new Times(e1, e2)); }
-    )
-  | e2 = ExprValRest(e1)
-    { return e2; }
-
-  )
-}
-
-// -----------------------------------------------------------------------------
-
-Expression Expr2() :
-{
-  Expression  e,
-              r;
-}
-{
-  e = ExprVal()
-  r = ExprValRest(e)
-  { return r; }
-}
-
-// -----------------------------------------------------------------------------
-
-Expression Expression() :
-{
-  Expression  e,
-              r;
-}
-{
-  e = ExprVal()
-  r = ExprRest(e)
-  { return r; }
 }
 
 // -----------------------------------------------------------------------------
 
 Type Type() :
 { Token t; }
-{ t = < TYPE_INT >
-      (        < LBRACK >
+{
+  t = < TYPE_INT >
+      (
+        < LBRACK >
         < RBRACK >
         { return new IntArrayType(); }
       )?
       { return new IntegerType(); }
-| t = < TYPE_BOOLEAN >    { return new BooleanType(); }
-| t = < IDENTIFIER >      { return new ObjectType(t.image); }
+| t = < TYPE_BOOLEAN >  { return new BooleanType(); }
+| t = < IDENTIFIER >    { return new ObjectType(t.image); }
 }
+
