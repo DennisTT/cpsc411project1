@@ -505,6 +505,3 @@ Type Type() :
 | t = < TYPE_BOOLEAN >  { return new BooleanType(); }
 | t = < IDENTIFIER >    { return new ObjectType(t.image); }
 }
-
-
-// test
