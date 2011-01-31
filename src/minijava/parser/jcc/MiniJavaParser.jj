@@ -23,27 +23,13 @@ SKIP :
 | "\r"
 | "\t"
 | "\n"
-|  < "//" (~["\n", "\r"])* ("\n" | "\r")? >
+| < "//" (~["\n", "\r"])* ("\n" | "\r")? > // Single-line comment
+| "/*": IN_COMMENT // See a starred comment - change to special IN_COMMENT state
 }
 
-// http://www.engr.mun.ca/~theo/JavaCC-FAQ/javacc-faq-moz.htm#tth_sEc3.10
-// When a /* is seen in the DEFAULT state, skip it and switch to the IN_COMMENT state
-SKIP :
-{
-  "/*": IN_COMMENT
-}
-      
-// When any other character is seen in the IN_COMMENT state, skip it.
-< IN_COMMENT > SKIP :
-{
-  <  ~[] >
-}
-      
-// When a */ is seen in the IN_COMMENT state, skip it and switch back to the DEFAULT state
-< IN_COMMENT > SKIP :
-{
-  "*/": DEFAULT
-}
+// In a starred comment
+// Based on: http://www.engr.mun.ca/~theo/JavaCC-FAQ/javacc-faq-moz.htm#tth_sEc3.10
+< IN_COMMENT > SKIP :{  < ~[] >       // Skip all characters while in starred comment.| "*/": DEFAULT // Exit starred comment state}
 
 // -----------------------------------------------------------------------------
 
@@ -109,7 +95,6 @@ TOKEN :
 {
   < TYPE_INT       : "int" >
 | < TYPE_BOOLEAN   : "boolean" >
-//| < TYPE_INT_ARRAY : "int" (< LBRACK > < RBRACK >)? >
 | < CONSTANT       : (< DIGIT >)+ >
 | < IDENTIFIER     : < LETTER > (< LETTER > | < DIGIT > | "_")* >
 | < #DIGIT         : [ "0"-"9" ] >
@@ -118,6 +103,7 @@ TOKEN :
 
 // -----------------------------------------------------------------------------
 
+// Builds an APT for an entire MiniJava source file
 Program Program() :
 {
   MainClass             mainClass;
@@ -133,6 +119,7 @@ Program Program() :
 
 // -----------------------------------------------------------------------------
 
+// Builds an APT for the MiniJava main class
 MainClass Main() :
 {
   Token     className,
@@ -162,6 +149,7 @@ MainClass Main() :
 
 // -----------------------------------------------------------------------------
 
+// Builds an APT for a MiniJava class
 ClassDecl ClassDeclaration() :
 {
   Token                 name,
@@ -192,6 +180,7 @@ ClassDecl ClassDeclaration() :
 
 // -----------------------------------------------------------------------------
 
+// Builds an APT for a MiniJava variable declaration
 VarDecl VarDeclaration(VarDecl.Kind kind) :
 {
   Type  type;
@@ -206,6 +195,7 @@ VarDecl VarDeclaration(VarDecl.Kind kind) :
 
 // -----------------------------------------------------------------------------
 
+// Builds an APT for a MiniJava method declaration
 MethodDecl MethodDeclaration() :
 {
   Type                  returnType;
@@ -227,11 +217,18 @@ MethodDecl MethodDeclaration() :
                 < LBRACE >
   (
     LOOKAHEAD(2)
-    varDecl   = VarDeclaration(VarDecl.Kind.LOCAL)  { vars.add(varDecl); }
+    varDecl   = VarDeclaration(VarDecl.Kind.LOCAL)
+                // Adding each local variable declaration to a list to
+                // be passed into MethodDecl constructor
+                { vars.add(varDecl); }
+                    
   )*
   (
     LOOKAHEAD(2)
-    s         = Statement()       { statements.add(s); }
+    s         = Statement()
+                // Adding each statement declaration to a list to
+                // be passed into MethodDecl constructor
+                { statements.add(s); }
   )*
                 < RETURN >
   returnExp   = Expression()
@@ -247,6 +244,7 @@ MethodDecl MethodDeclaration() :
 
 // -----------------------------------------------------------------------------
 
+// Builds an APT for an argument list in a MiniJava method
 ArrayList<VarDecl> FormalList() :
 {
   Type                t;
@@ -255,14 +253,17 @@ ArrayList<VarDecl> FormalList() :
 }
 {
   (
-    t   = Type()
-    id  = < IDENTIFIER >
-    { formals.add(new VarDecl(VarDecl.Kind.FORMAL, t, id.image)); }
+    // First formal
+    t     = Type()
+    id    = < IDENTIFIER >
+            { formals.add(new VarDecl(VarDecl.Kind.FORMAL, t, id.image)); }
+
+    // Rest of formals
     (
             < COMMA >
       t   = Type()
       id  = < IDENTIFIER >
-      { formals.add(new VarDecl(VarDecl.Kind.FORMAL, t, id.image)); }
+            { formals.add(new VarDecl(VarDecl.Kind.FORMAL, t, id.image)); }
     )*
   )?
   { return formals; }
