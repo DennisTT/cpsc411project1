@@ -24,12 +24,12 @@ SKIP :
 | "\t"
 | "\n"
 | < "//" (~["\n", "\r"])* ("\n" | "\r")? > // Single-line comment
-| "/*": IN_COMMENT // See a starred comment - change to special IN_COMMENT state
+| "/*": IN_COMMENT // Starred comment - change to special IN_COMMENT state
 }
 
-// In a starred comment
+// In a starred comment - characters to skip and return back to default state
 // Based on: http://www.engr.mun.ca/~theo/JavaCC-FAQ/javacc-faq-moz.htm#tth_sEc3.10
-< IN_COMMENT > SKIP :{  < ~[] >       // Skip all characters while in starred comment.| "*/": DEFAULT // Exit starred comment state}
+< IN_COMMENT > SKIP :{  < ~[] >       // Skip all characters while in starred comment.| "*/": DEFAULT // Skip ending characters and exit starred comment state}
 
 // -----------------------------------------------------------------------------
 
@@ -271,6 +271,7 @@ ArrayList<VarDecl> FormalList() :
 
 // -----------------------------------------------------------------------------
 
+// Builds an APT for a MiniJava statement
 Statement Statement() :
 {
   Token                 name;
@@ -281,11 +282,14 @@ Statement Statement() :
   ArrayList<Statement>  statements = new ArrayList<Statement>();
 }
 {
+  // Statement block
           < LBRACE >
   ( s1  = Statement() { statements.add(s1); } )*
           < RBRACE >
   { return new Block(new NodeList<Statement>(statements)); }
-|       < IF >
+  
+| // If statement
+        < IF >
         < LPAR >
   e1  = Expression()
         < RPAR >
@@ -293,25 +297,33 @@ Statement Statement() :
         < ELSE >
   s2  = Statement()
   { return new If(e1, s1, s2); }
-|       < WHILE >
+  
+| // While statement
+        < WHILE >
         < LPAR >
   e1  = Expression()
         < RPAR >
   s1  = Statement()
   { return new While(e1, s1); }
-|       < PRINTLN >
+  
+| // Println statement
+        < PRINTLN >
         < LPAR >
   e1  = Expression()
         < RPAR >
         < SEMICOLON >
   { return new Print(e1); }
-| LOOKAHEAD(2)
+  
+| // Assignment statement
+  LOOKAHEAD(2)
   name  = < IDENTIFIER >
           < EQUAL >
   e1    = Expression()
           < SEMICOLON >
   { return new Assign(name.image, e1); }
-| name  = < IDENTIFIER >
+  
+| // Array assignment statement
+  name  = < IDENTIFIER >
           < LBRACK >
   e1    = Expression()
           < RBRACK >
@@ -323,50 +335,18 @@ Statement Statement() :
 
 // -----------------------------------------------------------------------------
 
+// Builds an APT for a MiniJava expression
+// Operator precedence (low to high): &&, <, +/-, *, !, []/.
+// And Expressions
 Expression Expression() :
-{ Expression e; }
-{ e = AndExpr() { return e; } }
-
-// -----------------------------------------------------------------------------
-
-Expression BasicExpr() :
-{
-  Token       id;
-  Expression  e;
-}
-{ id = < CONSTANT >   { return new IntegerLiteral(id.image); }
-| < TRUE >            { return new BooleanLiteral(true); }
-| < FALSE >           { return new BooleanLiteral(false); }
-| id = < IDENTIFIER > { return new IdentifierExp(id.image); }
-| < THIS >            { return new This(); }
-| LOOKAHEAD(2)
-        < NEW >
-        < TYPE_INT >
-        < LBRACK >
-  e   = Expression()
-        < RBRACK >
-  { return new NewArray(e); }
-|       < NEW >
-  id  = < IDENTIFIER >
-        < LPAR >
-        < RPAR >
-  { return new NewObject(id.image); }
-|     < LPAR >
-  e   = Expression()
-      < RPAR >
-  { return e; }
-}
-
-// -----------------------------------------------------------------------------
-
-Expression AndExpr() :
 {
   Expression e1,
              e2;
 }
 {
   e1 = LessThanExpr()
-  (         < AND >
+  (
+         < AND >
     e2 = LessThanExpr()
     { e1 = new And(e1, e2); }
   )*
@@ -375,6 +355,8 @@ Expression AndExpr() :
 
 // -----------------------------------------------------------------------------
 
+// LessThan expressions
+// Helper method for Expression()
 Expression LessThanExpr() :
 {
   Expression e1,
@@ -392,6 +374,8 @@ Expression LessThanExpr() :
 
 // -----------------------------------------------------------------------------
 
+// Add/Minus expressions
+// Helper method for Expression()
 Expression AddMinusExpr() :
 {  Expression e1,
              e2;
@@ -410,6 +394,8 @@ Expression AddMinusExpr() :
 
 // -----------------------------------------------------------------------------
 
+// Times expressions
+// Helper method for Expression()
 Expression MultExpr() :
 {  Expression e1,
              e2;
@@ -424,16 +410,19 @@ Expression MultExpr() :
 
 // -----------------------------------------------------------------------------
 
+// Not expressions
+// Helper method for Expression()
 Expression NotExpr() :
 {  Expression e;
   int numNots = 0;
 }
 {  (
     < NOT >
-    { numNots++; }
+    { numNots++; } // Count the number of nots
   )*
   e = AccessorExpr()
   {
+    // Wrap the expression with the counted number of nots
     for(int i = 0; i < numNots; i++)
     {      e = new Not(e);
     }
@@ -442,6 +431,8 @@ Expression NotExpr() :
 }
 // -----------------------------------------------------------------------------
 
+// Accessor expressions
+// Helper method for Expression()
 Expression AccessorExpr() :
 {
   Expression  e1,
@@ -457,6 +448,53 @@ Expression AccessorExpr() :
 
 // -----------------------------------------------------------------------------
 
+// Builds an APT for a basic expression
+// Helper method for Expression()
+Expression BasicExpr() :
+{
+  Token       id;
+  Expression  e;
+}
+{ // Integer literal
+  id  = < CONSTANT >   { return new IntegerLiteral(id.image); }
+  
+| // Boolean literals
+        < TRUE >       { return new BooleanLiteral(true); }
+|       < FALSE >      { return new BooleanLiteral(false); }
+
+| // Identifier
+  id  = < IDENTIFIER > { return new IdentifierExp(id.image); }
+  
+| // This
+        < THIS >       { return new This(); }
+  
+| // Array
+  LOOKAHEAD(2)
+        < NEW >
+        < TYPE_INT >
+        < LBRACK >
+  e   = Expression()
+        < RBRACK >
+  { return new NewArray(e); }
+  
+| // Object
+        < NEW >
+  id  = < IDENTIFIER >
+        < LPAR >
+        < RPAR >
+  { return new NewObject(id.image); }
+  
+| // Parenthesized expression
+        < LPAR >
+  e     = Expression()
+        < RPAR >
+  { return e; }
+}
+
+// -----------------------------------------------------------------------------
+
+// Array access ([]), field/method access (.)
+// Helper method for Expression()
 Expression AccessorExprTail(Expression e) :
 {
   Token                 id;
@@ -493,16 +531,23 @@ Expression AccessorExprTail(Expression e) :
 
 // -----------------------------------------------------------------------------
 
+// Builds an APT for a MiniJava type
 Type Type() :
 { Token t; }
 {
+  // Integer
   t = < TYPE_INT >
       (
+        // Integer Array
         < LBRACK >
         < RBRACK >
         { return new IntArrayType(); }
       )?
       { return new IntegerType(); }
-| t = < TYPE_BOOLEAN >  { return new BooleanType(); }
-| t = < IDENTIFIER >    { return new ObjectType(t.image); }
+      
+| // Boolean
+  t = < TYPE_BOOLEAN >  { return new BooleanType(); }
+  
+| // Object
+  t = < IDENTIFIER >    { return new ObjectType(t.image); }
 }
